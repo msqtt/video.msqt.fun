@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: true
+# pnpm 10（Netlify 构建环境）读取此键
+onlyBuiltDependencies:
+  - esbuild

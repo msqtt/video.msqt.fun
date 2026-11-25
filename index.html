@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>视频工坊 · video.msqt.fun</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>视频工坊</h1>
+      <span id="status" class="badge" data-state="idle">初始化…</span>
+      <span class="badge">ffmpeg.wasm · 视频不出浏览器</span>
+    </header>
+    <nav id="tabs" class="tabs">
+      <button data-tab="probe" class="active">探测</button>
+      <button data-tab="trim">剪辑</button>
+      <button data-tab="transcode">转码</button>
+      <button data-tab="compress">压缩</button>
+      <button data-tab="frame">抽帧</button>
+      <button data-tab="gif">GIF</button>
+      <button data-tab="extractAudio">提音频</button>
+      <button data-tab="speed">变速</button>
+    </nav>
+    <main class="layout">
+      <section class="pane">
+        <label>输入视频</label>
+        <div id="drop" class="drop">拖拽视频到这里，或点击选择文件<br />（MP4 / WebM / MKV / MOV…）</div>
+        <input id="file" type="file" accept="video/*,.mkv" class="hidden" />
+        <video id="input-preview" controls muted></video>
+        <div class="meta"><span id="input-meta">未选择</span><button id="clear" class="btn small">清空</button></div>
+        <pre id="probe-card" class="log hidden"></pre>
+      </section>
+      <section class="pane controls">
+        <div class="op" data-op="probe"><p>读取时长 / 分辨率 / 编码 / 码率。</p></div>
+        <div class="op hidden" data-op="trim">
+          <label>起点（秒）<input id="tr-start" type="number" min="0" step="0.1" value="0" /></label>
+          <label>时长（秒）<input id="tr-duration" type="number" min="0.01" step="0.1" placeholder="到结尾" /></label>
+          <label class="check"><input id="tr-copy" type="checkbox" checked /> 流复制秒切（不重编码）</label>
+        </div>
+        <div class="op hidden" data-op="transcode">
+          <label>目标格式
+            <select id="tc-format">
+              <option value="mp4">MP4 (H.264)</option>
+              <option value="webm">WebM (VP8)</option>
+              <option value="mkv">MKV (H.264)</option>
+            </select>
+          </label>
+          <label>CRF 质量 <input id="tc-crf" type="number" min="0" max="51" placeholder="默认 23/30" /></label>
+          <label>预设
+            <select id="tc-preset">
+              <option value="ultrafast">ultrafast</option>
+              <option value="superfast">superfast</option>
+              <option value="veryfast" selected>veryfast</option>
+              <option value="faster">faster</option>
+              <option value="fast">fast</option>
+              <option value="medium">medium</option>
+            </select>
+          </label>
+        </div>
+        <div class="op hidden" data-op="compress">
+          <label>缩放（宽:高）<input id="cp-scale" type="text" placeholder="如 1280:-2，留空不改" /></label>
+          <label>CRF（18–35）<input id="cp-crf" type="number" min="18" max="35" value="28" /></label>
+          <label>帧率 <input id="cp-fps" type="number" min="1" max="60" placeholder="保持原帧率" /></label>
+        </div>
+        <div class="op hidden" data-op="frame">
+          <label>时间点（秒）<input id="fr-time" type="number" min="0" step="0.1" value="0" /></label>
+          <label>格式
+            <select id="fr-format">
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG</option>
+            </select>
+          </label>
+          <label>JPEG 质量（0–1）<input id="fr-quality" type="number" min="0" max="1" step="0.05" placeholder="默认" /></label>
+        </div>
+        <div class="op hidden" data-op="gif">
+          <label>起点（秒）<input id="gf-start" type="number" min="0" step="0.1" value="0" /></label>
+          <label>时长（≤10 秒）<input id="gf-duration" type="number" min="0.1" max="10" step="0.1" value="3" /></label>
+          <label>帧率 <input id="gf-fps" type="number" min="1" max="30" value="10" /></label>
+          <label>宽度 <input id="gf-width" type="number" min="16" max="1920" value="480" /></label>
+        </div>
+        <div class="op hidden" data-op="extractAudio">
+          <label>音频格式
+            <select id="ea-format">
+              <option value="mp3">MP3</option>
+              <option value="aac">AAC</option>
+              <option value="wav">WAV</option>
+              <option value="opus">Opus</option>
+            </select>
+          </label>
+        </div>
+        <div class="op hidden" data-op="speed">
+          <label>倍速（0.25–4）<input id="sp-factor" type="number" min="0.25" max="4" step="0.25" value="2" /></label>
+          <label class="check"><input id="sp-keepaudio" type="checkbox" checked /> 音频同步变速</label>
+        </div>
+        <button id="run" class="btn primary">执行</button>
+        <button id="cancel" class="btn hidden">取消</button>
+        <div id="progress-wrap" class="hidden">
+          <div class="bar"><div id="progress-bar"></div></div>
+          <span id="progress-text" class="meta"></span>
+        </div>
+        <p id="message" class="message"></p>
+      </section>
+      <section class="pane">
+        <label>输出结果</label>
+        <video id="output-video" controls class="hidden"></video>
+        <img id="output-image" alt="" class="hidden" />
+        <audio id="output-audio" controls class="hidden"></audio>
+        <textarea id="output-text" readonly placeholder="探测信息会显示在这里…"></textarea>
+        <div class="meta">
+          <span id="output-meta">—</span>
+          <button id="download" class="btn small">下载</button>
+        </div>
+        <label>ffmpeg 日志</label>
+        <pre id="log" class="log"></pre>
+      </section>
+    </main>
+    <footer class="foot">纯前端 ffmpeg.wasm 处理（首次运行需下载 ~31MB 引擎）· 支持 WTOP 协议接入 <a href="https://recycle.msqt.fun">可回收编排站</a></footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

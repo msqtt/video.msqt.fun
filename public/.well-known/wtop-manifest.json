@@ -1,0 +1,200 @@
+{
+  "protocolVersion": "1.0",
+  "name": "video-tool",
+  "displayName": "视频工坊",
+  "version": "1.0.0",
+  "viewport": { "width": 1080, "height": 760 },
+  "methods": [
+    {
+      "name": "probe",
+      "displayName": "探测信息",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 60000,
+      "input": {
+        "type": "object",
+        "required": ["video"],
+        "properties": { "video": { "type": "string", "format": "wtop-file", "description": "视频文件" } }
+      },
+      "output": {
+        "type": "object",
+        "required": ["duration", "width", "height", "videoCodec", "size"],
+        "properties": {
+          "duration": { "type": "number", "description": "秒" },
+          "width": { "type": "integer" },
+          "height": { "type": "integer" },
+          "videoCodec": { "type": "string" },
+          "audioCodec": { "type": "string" },
+          "bitrate": { "type": "integer" },
+          "fps": { "type": "number" },
+          "size": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "trim",
+      "displayName": "剪辑",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 300000,
+      "input": {
+        "type": "object",
+        "required": ["video", "start"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "start": { "type": "number", "minimum": 0, "description": "起点秒" },
+          "duration": { "type": "number", "minimum": 0.01, "description": "时长秒（缺省到结尾）" },
+          "copy": { "type": "boolean", "default": true, "description": "流复制秒切（false 重编码精确切）" }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["video", "size"],
+        "properties": { "video": { "type": "string", "format": "wtop-file" }, "size": { "type": "integer" } }
+      }
+    },
+    {
+      "name": "transcode",
+      "displayName": "转码",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 300000,
+      "input": {
+        "type": "object",
+        "required": ["video", "format"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "format": { "enum": ["mp4", "webm", "mkv"] },
+          "crf": { "type": "integer", "minimum": 0, "maximum": 51, "description": "质量（越小越清晰）" },
+          "preset": { "enum": ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium"], "default": "veryfast" }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["video", "size"],
+        "properties": { "video": { "type": "string", "format": "wtop-file" }, "size": { "type": "integer" } }
+      }
+    },
+    {
+      "name": "compress",
+      "displayName": "压缩",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 300000,
+      "input": {
+        "type": "object",
+        "required": ["video"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "scale": { "type": "string", "description": "如 1280:-2（宽:高，-2 保持偶数）" },
+          "crf": { "type": "integer", "minimum": 18, "maximum": 35, "default": 28 },
+          "fps": { "type": "number", "minimum": 1, "maximum": 60 }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["video", "size", "originalSize", "ratio"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "size": { "type": "integer" },
+          "originalSize": { "type": "integer" },
+          "ratio": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "frame",
+      "displayName": "抽帧",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 120000,
+      "input": {
+        "type": "object",
+        "required": ["video", "time"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "time": { "type": "number", "minimum": 0, "description": "时间点秒" },
+          "format": { "enum": ["png", "jpeg"], "default": "png" },
+          "quality": { "type": "number", "minimum": 0, "maximum": 1, "description": "jpeg 质量" }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["image", "width", "height"],
+        "properties": {
+          "image": { "type": "string", "format": "wtop-file" },
+          "width": { "type": "integer" },
+          "height": { "type": "integer" },
+          "size": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "gif",
+      "displayName": "转 GIF",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 300000,
+      "input": {
+        "type": "object",
+        "required": ["video"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "start": { "type": "number", "minimum": 0, "default": 0 },
+          "duration": { "type": "number", "minimum": 0.1, "maximum": 10, "default": 3, "description": "≤10 秒" },
+          "fps": { "type": "integer", "minimum": 1, "maximum": 30, "default": 10 },
+          "width": { "type": "integer", "minimum": 16, "maximum": 1920, "default": 480 }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["image", "size"],
+        "properties": {
+          "image": { "type": "string", "format": "wtop-file", "description": "image/gif" },
+          "size": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "extractAudio",
+      "displayName": "提取音频",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 300000,
+      "input": {
+        "type": "object",
+        "required": ["video", "format"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "format": { "enum": ["mp3", "aac", "wav", "opus"] }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["audio", "size"],
+        "properties": { "audio": { "type": "string", "format": "wtop-file" }, "size": { "type": "integer" } }
+      }
+    },
+    {
+      "name": "speed",
+      "displayName": "变速",
+      "mode": "headless",
+      "stateless": true,
+      "timeoutMs": 300000,
+      "input": {
+        "type": "object",
+        "required": ["video", "factor"],
+        "properties": {
+          "video": { "type": "string", "format": "wtop-file" },
+          "factor": { "type": "number", "minimum": 0.25, "maximum": 4, "description": "倍速（2=两倍速）" },
+          "keepAudio": { "type": "boolean", "default": true, "description": "音频同步变速" }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": ["video", "size"],
+        "properties": { "video": { "type": "string", "format": "wtop-file" }, "size": { "type": "integer" } }
+      }
+    }
+  ]
+}

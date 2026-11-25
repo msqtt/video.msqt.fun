@@ -1,0 +1,21 @@
+{
+  "name": "@wtop/core",
+  "version": "1.0.0",
+  "description": "WTOP 协议内核：信封/握手/校验/传输/文件",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@wtop/types": "file:../types",
+    "ajv": "^8.17.1"
+  }
+}

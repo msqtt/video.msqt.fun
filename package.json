@@ -1,0 +1,21 @@
+{
+  "name": "video-msqt-fun",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5183 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5183 --strictPort",
+    "sync-sdk": "bash scripts/sync-sdk.sh"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "@ffmpeg/util": "0.12.2",
+    "@wtop/provider": "file:vendor/wtop/provider"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

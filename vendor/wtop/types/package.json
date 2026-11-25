@@ -1,0 +1,17 @@
+{
+  "name": "@wtop/types",
+  "version": "1.0.0",
+  "description": "WTOP 协议类型与常量（零运行时依赖）",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

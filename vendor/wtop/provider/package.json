@@ -1,0 +1,21 @@
+{
+  "name": "@wtop/provider",
+  "version": "1.0.0",
+  "description": "WTOP 工具站接入 SDK：握手/方法分发/事件上报",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@wtop/core": "file:../core",
+    "@wtop/types": "file:../types"
+  }
+}
