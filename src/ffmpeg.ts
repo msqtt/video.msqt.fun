@@ -15,6 +15,7 @@ let queue: Promise<unknown> = Promise.resolve();
 
 let lastLog = '';
 let lastPercent = 0;
+let loadText = '加载 ffmpeg core…';
 const logListeners = new Set<(line: string) => void>();
 
 export function onLog(fn: (line: string) => void): () => void {
@@ -24,12 +25,14 @@ export function onLog(fn: (line: string) => void): () => void {
 
 async function fetchCore(ctx: Ctx): Promise<{ coreURL: string; wasmURL: string }> {
   if (coreCache) return coreCache;
-  const report = (received: number, total: number, what: string) =>
+  const report = (received: number, total: number, what: string) => {
+    loadText = `下载 ffmpeg ${what} ${(received / 1024 / 1024).toFixed(1)}MB`;
     ctx?.reportProgress({
       percent: total ? Math.min(99, Math.round((received / total) * 100)) : undefined,
-      text: `下载 ffmpeg ${what} ${(received / 1024 / 1024).toFixed(1)}MB`,
+      text: loadText,
       stage: 'load',
     });
+  };
   for (const base of [CORE_BASE, CORE_BASE_FALLBACK]) {
     try {
       const coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript', true, ({ received, total }) => report(received, total, 'core'));
@@ -49,19 +52,26 @@ async function load(ctx: Ctx): Promise<FFmpeg> {
   if (ff) return ff;
   if (loading) return loading;
   loading = (async () => {
-    const { coreURL, wasmURL } = await fetchCore(ctx);
-    const inst = new FFmpeg();
-    inst.on('log', ({ message }) => {
-      lastLog = message;
-      for (const fn of logListeners) fn(message);
-    });
-    inst.on('progress', ({ progress }) => {
-      lastPercent = Math.max(0, Math.min(99, Math.round(progress * 100)));
-    });
-    ctx?.reportProgress({ text: '初始化 ffmpeg…', stage: 'load' });
-    await inst.load({ classWorkerURL: workerURL, coreURL, wasmURL });
-    ff = inst;
-    return inst;
+    // 下载 chunk 报告之间有网络静默、inst.load 编译期无事件：全程 5s 心跳保活 HOST watchdog
+    const beat = setInterval(() => ctx?.reportProgress({ text: loadText, stage: 'load' }), 5000);
+    try {
+      const { coreURL, wasmURL } = await fetchCore(ctx);
+      const inst = new FFmpeg();
+      inst.on('log', ({ message }) => {
+        lastLog = message;
+        for (const fn of logListeners) fn(message);
+      });
+      inst.on('progress', ({ progress }) => {
+        lastPercent = Math.max(0, Math.min(99, Math.round(progress * 100)));
+      });
+      loadText = '初始化 ffmpeg…';
+      ctx?.reportProgress({ text: loadText, stage: 'load' });
+      await inst.load({ classWorkerURL: workerURL, coreURL, wasmURL });
+      ff = inst;
+      return inst;
+    } finally {
+      clearInterval(beat);
+    }
   })();
   try {
     return await loading;
@@ -97,55 +107,59 @@ export interface RunResult { blob?: Blob; code: number; logs: string[] }
 /** 互斥队列内完成 写入→exec→读取→清理 全流程；5s 心跳进度；abort→terminate */
 export function runFF(opts: RunOpts): Promise<RunResult> {
   const { args, inputs = [], output, extraCleanup = [], ctx, allowFail } = opts;
+  // 心跳覆盖排队等待期：互斥队列里前序长任务期间本调用也须保活 HOST watchdog
+  const heartbeat = setInterval(() => {
+    ctx?.reportProgress({ percent: lastPercent, text: lastLog || '排队/处理中', stage: 'exec' });
+  }, 5000);
   return enqueue(async () => {
-    if (ctx?.signal.aborted) throw new WtopError('CANCELLED', '调用已取消');
-    const inst = await load(ctx);
-    const logs: string[] = [];
-    const collect = (line: string) => { logs.push(line); if (logs.length > 400) logs.shift(); };
-    const off = onLog(collect);
-    lastPercent = 0;
-    const heartbeat = setInterval(() => {
-      ctx?.reportProgress({ percent: lastPercent, text: lastLog || '处理中', stage: 'exec' });
-    }, 5000);
-    const onAbort = () => kill();
-    ctx?.signal.addEventListener('abort', onAbort, { once: true });
-    const written: string[] = [];
     try {
-      for (const f of inputs) {
-        if (f.blob.size > 150 * 1024 * 1024) {
-          ctx?.logger.warn(`输入 ${(f.blob.size / 1024 / 1024).toFixed(0)}MB 超过 150MB，wasm 内存（~2GB 上限）可能不足`);
-          ctx?.reportProgress({ text: '⚠ 大文件：可能触发内存上限', stage: 'exec' });
-        }
-        await inst.writeFile(f.name, new Uint8Array(await f.blob.arrayBuffer()));
-        written.push(f.name);
-      }
-      ctx?.reportProgress({ percent: 0, text: `ffmpeg ${args.join(' ')}`.slice(0, 200), stage: 'exec' });
-      const code = await inst.exec(args);
       if (ctx?.signal.aborted) throw new WtopError('CANCELLED', '调用已取消');
-      if (code !== 0 && !allowFail) {
-        throw new WtopError('BUSINESS_ERROR', `ffmpeg 退出码 ${code}`, { logs: logs.slice(-30) });
-      }
-      let blob: Blob | undefined;
-      if (output) {
-        const data = await inst.readFile(output.name);
-        if (typeof data === 'string' || !data.byteLength) {
-          throw new WtopError('BUSINESS_ERROR', `输出文件 ${output.name} 为空`, { logs: logs.slice(-30) });
+      const inst = await load(ctx);
+      const logs: string[] = [];
+      const collect = (line: string) => { logs.push(line); if (logs.length > 400) logs.shift(); };
+      const off = onLog(collect);
+      lastPercent = 0;
+      const onAbort = () => kill();
+      ctx?.signal.addEventListener('abort', onAbort, { once: true });
+      const written: string[] = [];
+      try {
+        for (const f of inputs) {
+          if (f.blob.size > 150 * 1024 * 1024) {
+            ctx?.logger.warn(`输入 ${(f.blob.size / 1024 / 1024).toFixed(0)}MB 超过 150MB，wasm 内存（~2GB 上限）可能不足`);
+            ctx?.reportProgress({ text: '⚠ 大文件：可能触发内存上限', stage: 'exec' });
+          }
+          await inst.writeFile(f.name, new Uint8Array(await f.blob.arrayBuffer()));
+          written.push(f.name);
         }
-        blob = new Blob([new Uint8Array(data)], { type: output.mime });
+        ctx?.reportProgress({ percent: 0, text: `ffmpeg ${args.join(' ')}`.slice(0, 200), stage: 'exec' });
+        const code = await inst.exec(args);
+        if (ctx?.signal.aborted) throw new WtopError('CANCELLED', '调用已取消');
+        if (code !== 0 && !allowFail) {
+          throw new WtopError('BUSINESS_ERROR', `ffmpeg 退出码 ${code}`, { logs: logs.slice(-30) });
+        }
+        let blob: Blob | undefined;
+        if (output) {
+          const data = await inst.readFile(output.name);
+          if (typeof data === 'string' || !data.byteLength) {
+            throw new WtopError('BUSINESS_ERROR', `输出文件 ${output.name} 为空`, { logs: logs.slice(-30) });
+          }
+          blob = new Blob([new Uint8Array(data)], { type: output.mime });
+        }
+        return { blob, code, logs };
+      } catch (e) {
+        if (ctx?.signal.aborted) throw new WtopError('CANCELLED', '调用已取消');
+        if (e instanceof WtopError) throw e;
+        kill();
+        throw new WtopError('BUSINESS_ERROR', `ffmpeg 执行失败: ${String(e instanceof Error ? e.message : e)}`, { logs: logs.slice(-30) });
+      } finally {
+        ctx?.signal.removeEventListener('abort', onAbort);
+        off();
+        for (const f of [...written, ...(output ? [output.name] : []), ...extraCleanup]) {
+          try { await inst.deleteFile(f); } catch { /* 可能未写入 */ }
+        }
       }
-      return { blob, code, logs };
-    } catch (e) {
-      if (ctx?.signal.aborted) throw new WtopError('CANCELLED', '调用已取消');
-      if (e instanceof WtopError) throw e;
-      kill();
-      throw new WtopError('BUSINESS_ERROR', `ffmpeg 执行失败: ${String(e instanceof Error ? e.message : e)}`, { logs: logs.slice(-30) });
     } finally {
       clearInterval(heartbeat);
-      ctx?.signal.removeEventListener('abort', onAbort);
-      off();
-      for (const f of [...written, ...(output ? [output.name] : []), ...extraCleanup]) {
-        try { await inst.deleteFile(f); } catch { /* 可能未写入 */ }
-      }
     }
   });
 }
