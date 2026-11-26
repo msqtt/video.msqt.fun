@@ -2,7 +2,7 @@
   "protocolVersion": "1.0",
   "name": "video-tool",
   "displayName": "视频工坊",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "viewport": { "width": 1080, "height": 760 },
   "methods": [
     {
@@ -10,7 +10,7 @@
       "displayName": "探测信息",
       "mode": "headless",
       "stateless": true,
-      "timeoutMs": 180000,
+      "timeoutMs": 300000,
       "input": {
         "type": "object",
         "required": ["video"],

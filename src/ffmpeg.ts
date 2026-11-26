@@ -1,6 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
-import workerURL from '@ffmpeg/ffmpeg/worker?url';
+import workerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 import { WtopError, type MethodContext } from '@wtop/provider';
 
 const CORE_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.9/dist/esm';
