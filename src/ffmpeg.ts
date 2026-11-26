@@ -28,7 +28,7 @@ async function fetchCore(ctx: Ctx): Promise<{ coreURL: string; wasmURL: string }
   const report = (received: number, total: number, what: string) => {
     loadText = `下载 ffmpeg ${what} ${(received / 1024 / 1024).toFixed(1)}MB`;
     ctx?.reportProgress({
-      percent: total ? Math.min(99, Math.round((received / total) * 100)) : undefined,
+      percent: total > 0 ? Math.max(0, Math.min(99, Math.round((received / total) * 100))) : undefined,
       text: loadText,
       stage: 'load',
     });
