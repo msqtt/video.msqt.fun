@@ -153,6 +153,7 @@ export declare const DEFAULTS: {
     defaultTimeoutMs: number;
     humanTimeoutMs: number;
     preserveFailedMs: number;
+    keepShownMs: number;
     maxConcurrent: number;
     largeFileThresholdBytes: number;
     cancelGraceMs: number;

@@ -32,6 +32,19 @@ const provider = createProvider({
     'http://127.0.0.1:5179',
   ],
   autoHandshake: false,
+  mirror: {
+    start: ({ method, params }) => {
+      if (running) return; // 本地 UI 运行中让位
+      setActiveTab(method as OpName);
+      const p = params as { video?: Blob };
+      if (p.video instanceof Blob) setVideoInput(p.video);
+      showProgress(0, `HOST 调用 ${method}…`);
+    },
+    progress: ({ progress }) => { if (!running) showProgress(progress.percent, progress.text ?? ''); },
+    result: ({ data }) => { if (!running) { render(data as Record<string, unknown>); showProgress(100, '完成'); } },
+    error: ({ error }) => { if (!running) { message.textContent = `[${error.code}] ${error.message}`; message.classList.add('err'); showProgress(0, '失败'); } },
+    cancel: () => { if (!running) showProgress(0, '已取消'); },
+  },
 });
 for (const [name, fn] of Object.entries(OPS)) {
   provider.registerMethod(name, async (p, ctx) => fn(p as never, ctx));
@@ -163,13 +176,17 @@ async function run() {
   }
 }
 
+function setActiveTab(op: OpName) {
+  active = op;
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', (b as HTMLElement).dataset.tab === op));
+  document.querySelectorAll('.op').forEach((el) => el.classList.toggle('hidden', (el as HTMLElement).dataset.op !== op));
+  message.textContent = '';
+}
+
 $('tabs').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest('button');
   if (!btn?.dataset.tab) return;
-  active = btn.dataset.tab as OpName;
-  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b === btn));
-  document.querySelectorAll('.op').forEach((el) => el.classList.toggle('hidden', (el as HTMLElement).dataset.op !== active));
-  message.textContent = '';
+  setActiveTab(btn.dataset.tab as OpName);
 });
 
 const drop = $('drop');

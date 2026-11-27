@@ -25,6 +25,17 @@ export function createProvider(options) {
         if (hostOrigin)
             transport.send(msg, hostOrigin);
     };
+    const fireMirror = (kind, e) => {
+        const hook = options.mirror?.[kind];
+        if (!hook)
+            return;
+        try {
+            hook(e);
+        }
+        catch (err) {
+            logger.error(`[wtop/provider] mirror.${kind} 回调异常`, err);
+        }
+    };
     const sendError = (callId, err) => {
         send({
             wtop: negotiatedVersion, type: 'error', sessionId: sessionId, callId,
@@ -59,6 +70,7 @@ export function createProvider(options) {
         call.controller.abort();
         sendError(call.callId, err);
         calls.delete(call.callId);
+        fireMirror('cancel', { callId: call.callId, method: call.method, reason });
     };
     const makeCtx = (call) => ({
         callId: call.callId,
@@ -71,6 +83,7 @@ export function createProvider(options) {
             if (call.terminal)
                 return;
             send({ wtop: negotiatedVersion, type: 'progress', sessionId: sessionId, callId: call.callId, payload: p });
+            fireMirror('progress', { callId: call.callId, method: call.method, progress: p });
         },
         requestHuman(opts) {
             if (call.terminal)
@@ -119,6 +132,7 @@ export function createProvider(options) {
             call.terminal = true;
             send({ wtop: negotiatedVersion, type: 'result', sessionId: sessionId, callId: call.callId, payload: { data: output } });
             calls.delete(call.callId);
+            fireMirror('result', { callId: call.callId, method: call.method, data: output });
         }
         catch (e) {
             if (call.terminal)
@@ -129,6 +143,7 @@ export function createProvider(options) {
                 : new WtopError('BUSINESS_ERROR', String(e instanceof Error ? e.message : e), e instanceof Error ? { stack: e.stack } : undefined);
             sendError(call.callId, err);
             calls.delete(call.callId);
+            fireMirror('error', { callId: call.callId, method: call.method, error: err });
         }
     };
     const handleMessage = (msg, origin) => {
@@ -192,6 +207,7 @@ export function createProvider(options) {
                     }
                 }
                 calls.set(callId, call);
+                fireMirror('start', { callId, method, params });
                 void runMethod(call, fn, params);
                 return;
             }

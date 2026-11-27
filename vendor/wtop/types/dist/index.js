@@ -33,6 +33,7 @@ export const DEFAULTS = {
     defaultTimeoutMs: 60000,
     humanTimeoutMs: 30 * 60000,
     preserveFailedMs: 120000,
+    keepShownMs: 600000,
     maxConcurrent: 8,
     largeFileThresholdBytes: 50 * 1024 * 1024,
     cancelGraceMs: 5000,
